@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -17,6 +18,8 @@ func main() {
 	// --- CLI flags ---
 	configPath := flag.String("config", "config.json", "Path to config file")
 	portOverride := flag.Int("port", 0, "Override config port")
+	dbPath := flag.String("db", "honeypot.db", "Path to sqlite database")
+	geoipPath := flag.String("geoip", "GeoLite2-City.mmdb", "Path to MaxMind GeoIP database")
 	flag.Parse()
 
 	// --- Load config ---
@@ -30,11 +33,24 @@ func main() {
 		cfg.Port = *portOverride
 	}
 
+	// --- Initialize Intelligence Engines ---
+	fmt.Println("Initializing Threat Intelligence Databases...")
+	db, err := server.NewDatabase(*dbPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fatal: failed to open sqlite database: %v\n", err)
+		os.Exit(1)
+	}
+
+	geoip, err := server.NewGeoIP(*geoipPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: maxmind geoip db failed to load, falling back to api: %v\n", err)
+	}
+
 	// --- Build server ---
 	s := server.New(server.Options{
 		Host:         cfg.Host,
 		Port:         cfg.Port,
-		StaticDir:    cfg.StaticDir,
+		StaticDir:    cfg.StaticDir, // This will host our Vue.js SPA
 		ReadTimeout:  time.Duration(cfg.Timeout.Read) * time.Second,
 		WriteTimeout: time.Duration(cfg.Timeout.Write) * time.Second,
 		IdleTimeout:  time.Duration(cfg.Timeout.Idle) * time.Second,
@@ -60,35 +76,58 @@ func main() {
 		}))
 	}
 
+	// --- Inject Honeypot Trap ---
+	// Always place honeypot AFTER logger/cors but BEFORE routing standard requests
+	s.Use(middleware.Honeypot(db, geoip))
+
 	// --- Register routes ---
 	router := s.Router()
 
-	// Health check
+	// System Health check
 	router.GET("/health", func(req *server.Request, res *server.ResponseWriter) {
 		res.WriteJSON(200, map[string]string{
-			"status": "ok",
+			"status":   "ok",
+			"honeypot": "armed",
 		})
 	})
 
-	// Example API route
-	router.GET("/api/hello", func(req *server.Request, res *server.ResponseWriter) {
-		name := req.Query["name"]
-		if name == "" {
-			name = "World"
+	// --- Threat Intelligence Dashboard APIs ---
+
+	// GET /api/threats/live - Returns the latest captured attacks
+	router.GET("/api/threats/live", func(req *server.Request, res *server.ResponseWriter) {
+		limit := 50
+		if req.Query["limit"] != "" {
+			if l, err := strconv.Atoi(req.Query["limit"]); err == nil && l > 0 && l <= 1000 {
+				limit = l
+			}
 		}
-		res.WriteJSON(200, map[string]string{
-			"message": "Hello, " + name + "!",
-		})
+
+		attacks, err := db.GetRecentAttacks(limit)
+		if err != nil {
+			res.WriteJSON(500, map[string]string{"error": "failed to fetch threat log"})
+			return
+		}
+
+		if attacks == nil {
+			attacks = []server.AttackEvent{} // Ensure JSON array instead of null
+		}
+		res.WriteJSON(200, attacks)
 	})
 
-	// Echo route — returns request info as JSON (useful for debugging)
-	router.GET("/api/echo", func(req *server.Request, res *server.ResponseWriter) {
+	// GET /api/threats/stats - Returns leaderboards and metrics
+	router.GET("/api/threats/stats", func(req *server.Request, res *server.ResponseWriter) {
+		topCountries, err := db.GetTopCountries(10)
+		if err != nil {
+			res.WriteJSON(500, map[string]string{"error": "failed to fetch stats"})
+			return
+		}
+
+		if topCountries == nil {
+			topCountries = []server.CountryStat{}
+		}
+
 		res.WriteJSON(200, map[string]any{
-			"method":      req.Method,
-			"path":        req.Path,
-			"query":       req.Query,
-			"remote_addr": req.RemoteAddr,
-			"headers":     req.Headers,
+			"top_countries": topCountries,
 		})
 	})
 
@@ -102,7 +141,7 @@ func main() {
 
 	go func() {
 		<-quit
-		fmt.Println("\nshutting down...")
+		fmt.Println("\nshutting down safely...")
 		cancel()
 	}()
 
