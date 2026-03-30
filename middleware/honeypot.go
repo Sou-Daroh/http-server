@@ -98,8 +98,9 @@ func Honeypot(db *server.Database, geoip *server.GeoIP) server.MiddlewareFunc {
 // extractIP pulls out the IP from net.Addr strings like "10.0.0.1:45312"
 func extractIP(remoteAddr string) string {
 	if idx := strings.LastIndex(remoteAddr, ":"); idx != -1 {
-		// Assuming IPv4 format mostly, avoiding port. Real logic would use net.SplitHostPort safely
-		return remoteAddr[:idx]
+		// Parse out port and clean up IPv6 brackets like [::1]
+		ip := remoteAddr[:idx]
+		return strings.Trim(ip, "[]")
 	}
-	return remoteAddr
+	return strings.Trim(remoteAddr, "[]")
 }
