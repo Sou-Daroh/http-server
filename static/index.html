@@ -1,80 +1,15 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>http-server</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Courier New', monospace;
-      background: #0d1117;
-      color: #c9d1d9;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 2rem;
-    }
-    .container { max-width: 600px; width: 100%; }
-    .badge {
-      display: inline-block;
-      background: #238636;
-      color: #fff;
-      font-size: 0.75rem;
-      padding: 0.2rem 0.6rem;
-      border-radius: 2rem;
-      margin-bottom: 1rem;
-    }
-    h1 { font-size: 2rem; color: #f0f6fc; margin-bottom: 0.5rem; }
-    p { color: #8b949e; margin-bottom: 2rem; line-height: 1.6; }
-    .endpoints { border: 1px solid #30363d; border-radius: 6px; overflow: hidden; }
-    .endpoint {
-      display: flex;
-      align-items: center;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid #30363d;
-      gap: 1rem;
-    }
-    .endpoint:last-child { border-bottom: none; }
-    .method {
-      font-size: 0.7rem;
-      font-weight: bold;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      min-width: 50px;
-      text-align: center;
-    }
-    .get { background: #1f6feb; color: #fff; }
-    .path { color: #79c0ff; flex: 1; }
-    .desc { color: #8b949e; font-size: 0.85rem; }
-    a.path { text-decoration: none; }
-    a.path:hover { text-decoration: underline; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <span class="badge">● running</span>
-    <h1>http-server</h1>
-    <p>HTTP/1.1 server built from raw TCP sockets in Go. No frameworks.</p>
-
-    <div class="endpoints">
-      <div class="endpoint">
-        <span class="method get">GET</span>
-        <a class="path" href="/health">/health</a>
-        <span class="desc">Health check</span>
-      </div>
-      <div class="endpoint">
-        <span class="method get">GET</span>
-        <a class="path" href="/api/hello">/api/hello</a>
-        <span class="desc">Hello world JSON response</span>
-      </div>
-      <div class="endpoint">
-        <span class="method get">GET</span>
-        <a class="path" href="/api/echo">/api/echo</a>
-        <span class="desc">Echo request details as JSON</span>
-      </div>
-    </div>
-  </div>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Overwatch | Threat Engine</title>
+    <!-- We link the Leaflet mapping CSS securely so the map tiles render seamlessly -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script type="module" crossorigin src="/assets/index-DizeZyb5.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D9p4UYKZ.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
 </html>
