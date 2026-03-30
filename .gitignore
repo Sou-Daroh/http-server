@@ -1,0 +1,29 @@
+﻿# Build output
+http-server
+http-server.exe
+http-server-linux
+http-server-macos
+
+# Logs
+*.log
+access.log
+
+# Config with secrets
+config.local.json
+
+# Test output
+coverage.out
+coverage.html
+
+# Benchmark results
+bench/results/*.txt
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
