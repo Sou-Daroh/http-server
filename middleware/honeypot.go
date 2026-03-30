@@ -65,11 +65,12 @@ func Honeypot(db *server.Database, geoip *server.GeoIP) server.MiddlewareFunc {
 					payload += "\n" + bodyStr
 				}
 
-				// Look up location safely
-				loc := geoip.Lookup(ip)
+				targetPath := req.Path
 
-				// Fire and forget the database save so we don't block the high-volume TCP socket
+				// Fire and forget the geoip lookup and database save so we don't block the high-volume TCP socket
 				go func() {
+					loc := geoip.Lookup(ip)
+
 					db.LogAttack(server.AttackEvent{
 						IP:        ip,
 						Country:   loc.Country,
@@ -77,7 +78,7 @@ func Honeypot(db *server.Database, geoip *server.GeoIP) server.MiddlewareFunc {
 						Lat:       loc.Lat,
 						Lon:       loc.Lon,
 						Payload:   payload,
-						Target:    req.Path,
+						Target:    targetPath,
 						Timestamp: time.Now(),
 					})
 				}()

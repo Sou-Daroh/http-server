@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -30,6 +31,7 @@ type CountryStat struct {
 // Database manages the SQLite connection for the honeypot.
 type Database struct {
 	db *sql.DB
+	mu sync.Mutex
 }
 
 // NewDatabase initializes a new SQLite database at the given path.
@@ -71,6 +73,9 @@ func (d *Database) migrate() error {
 }
 
 func (d *Database) LogAttack(event AttackEvent) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	query := `
 	INSERT INTO attacks (ip, country, city, lat, lon, payload, target, timestamp)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
