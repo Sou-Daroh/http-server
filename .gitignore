@@ -1,4 +1,4 @@
-﻿# Build output
+# Build output
 http-server
 http-server.exe
 http-server-linux
@@ -26,4 +26,5 @@ bench/results/*.txt
 
 # OS
 .DS_Store
+*.db
 Thumbs.db
