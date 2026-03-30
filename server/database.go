@@ -3,10 +3,9 @@ package server
 import (
 	"database/sql"
 	"fmt"
-	"sync"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/lib/pq"
 )
 
 // AttackEvent represents a single malicious request caught by the honeypot.
@@ -28,35 +27,40 @@ type CountryStat struct {
 	Count   int    `json:"count"`
 }
 
-// Database manages the SQLite connection for the honeypot.
+// Database manages the Postgres connection pooling for the honeypot.
 type Database struct {
 	db *sql.DB
-	mu sync.Mutex
 }
 
-// NewDatabase initializes a new SQLite database at the given path.
+// NewDatabase initializes a new Postgres connection pool.
 func NewDatabase(dsn string) (*Database, error) {
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open sqlite %s: %w", dsn, err)
+		return nil, fmt.Errorf("open postgres: %w", err)
 	}
 
+	// Advanced Training Requirement: Connection Pooling for Scalability 
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("ping sqlite: %w", err)
+		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
 	d := &Database{db: db}
 	if err := d.migrate(); err != nil {
-		return nil, fmt.Errorf("migrate db: %w", err)
+		return nil, fmt.Errorf("migrate postgres db: %w", err)
 	}
 
 	return d, nil
 }
 
 func (d *Database) migrate() error {
+	// Postgres natively uses SERIAL instead of AUTOINCREMENT
 	query := `
 	CREATE TABLE IF NOT EXISTS attacks (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id SERIAL PRIMARY KEY,
 		ip TEXT NOT NULL,
 		country TEXT NOT NULL,
 		city TEXT NOT NULL,
@@ -64,21 +68,25 @@ func (d *Database) migrate() error {
 		lon REAL NOT NULL,
 		payload TEXT,
 		target TEXT NOT NULL,
-		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+		timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_attacks_timestamp ON attacks(timestamp);
+
+	CREATE TABLE IF NOT EXISTS admins (
+		id SERIAL PRIMARY KEY,
+		username TEXT UNIQUE NOT NULL,
+		password_hash TEXT NOT NULL
+	);
 	`
 	_, err := d.db.Exec(query)
 	return err
 }
 
 func (d *Database) LogAttack(event AttackEvent) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
+	// Postgres explicitly uses $1, $2 index placeholders instead of ?
 	query := `
 	INSERT INTO attacks (ip, country, city, lat, lon, payload, target, timestamp)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	_, err := d.db.Exec(query,
 		event.IP, event.Country, event.City, event.Lat, event.Lon,
@@ -92,7 +100,7 @@ func (d *Database) GetRecentAttacks(limit int) ([]AttackEvent, error) {
 	SELECT id, ip, country, city, lat, lon, payload, target, timestamp
 	FROM attacks
 	ORDER BY id DESC
-	LIMIT ?
+	LIMIT $1
 	`
 	rows, err := d.db.Query(query, limit)
 	if err != nil {
@@ -120,7 +128,7 @@ func (d *Database) GetTopCountries(limit int) ([]CountryStat, error) {
 	FROM attacks
 	GROUP BY country
 	ORDER BY count DESC
-	LIMIT ?
+	LIMIT $1
 	`
 	rows, err := d.db.Query(query, limit)
 	if err != nil {
