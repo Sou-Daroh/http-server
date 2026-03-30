@@ -24,6 +24,7 @@ func Honeypot(db *server.Database, geoip *server.GeoIP) server.MiddlewareFunc {
 		"swagger-ui",
 		"cmd=",
 		"exec=",
+		"jndi:", // Added Log4Shell JNDI injection footprint
 	}
 
 	isSuspicious := func(path, rawQuery string) bool {
