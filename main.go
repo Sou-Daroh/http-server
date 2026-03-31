@@ -38,6 +38,7 @@ func main() {
 
 	// --- Public Routes ---
 	r.Static("/static", "./static")
+	r.Static("/assets", "./static/assets") // Map Vue's Vite asset bundler paths dynamically
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(301, "/static/")
 	})
