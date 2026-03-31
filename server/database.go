@@ -53,6 +53,11 @@ func NewDatabase(dsn string) (*Database, error) {
 		return nil, fmt.Errorf("migrate postgres db: %w", err)
 	}
 
+	// Automatic Syllabus Fulfillment: Seed a default Admin for the Dashboard
+	if err := d.SeedDefaultAdmin(); err != nil {
+		return nil, fmt.Errorf("seed default admin: %w", err)
+	}
+
 	return d, nil
 }
 
@@ -145,4 +150,26 @@ func (d *Database) GetTopCountries(limit int) ([]CountryStat, error) {
 		stats = append(stats, s)
 	}
 	return stats, rows.Err()
+}
+
+// SeedDefaultAdmin creates a fallback admin user using our bcrypt library.
+func (d *Database) SeedDefaultAdmin() error {
+	var count int
+	d.db.QueryRow("SELECT COUNT(*) FROM admins").Scan(&count)
+	if count == 0 {
+		hash, _ := HashPassword("admin123") 
+		_, err := d.db.Exec("INSERT INTO admins (username, password_hash) VALUES ($1, $2)", "admin", hash)
+		return err
+	}
+	return nil
+}
+
+// VerifyAdmin checks if the provided credentials align with the bcrypt hash safely stored in Postgres.
+func (d *Database) VerifyAdmin(username, plainPassword string) bool {
+	var hash string
+	err := d.db.QueryRow("SELECT password_hash FROM admins WHERE username = $1", username).Scan(&hash)
+	if err != nil {
+		return false // User not found
+	}
+	return CheckPasswordHash(plainPassword, hash)
 }

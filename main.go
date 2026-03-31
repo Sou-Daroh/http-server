@@ -46,6 +46,31 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok", "honeypot": "armed"})
 	})
 
+	// Dashboard Authentication Gateway
+	r.POST("/api/login", func(c *gin.Context) {
+		var req struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid auth payload format"})
+			return
+		}
+
+		if db.VerifyAdmin(req.Username, req.Password) {
+			token, err := server.GenerateJWT(req.Username)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "Server failed to forge JWT token"})
+				return
+			}
+			// Respond with the token so the Vue browser can cache it
+			c.JSON(200, gin.H{"token": token})
+			return
+		}
+
+		c.JSON(401, gin.H{"error": "Invalid admin credentials"})
+	})
+
 	// --- Protected Advanced Training APIs ---
 	api := r.Group("/api")
 	api.Use(middleware.JWTAuthMiddleware())
