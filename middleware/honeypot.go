@@ -1,16 +1,18 @@
 package middleware
 
 import (
+	"bytes"
+	"io"
 	"strings"
 	"time"
 
 	"github.com/Sou-Daroh/http-server/server"
+	"github.com/gin-gonic/gin"
 )
 
-// Honeypot returns middleware that intercepts suspicious requests
-// and logs them to the sqlite database before they hit the real backend.
-func Honeypot(db *server.Database, geoip *server.GeoIP) server.MiddlewareFunc {
-	// List of paths that bots and hackers actively scan for
+// Honeypot returns a Gin middleware that intercepts suspicious requests
+// and logs them to PostgreSQL before they hit the real backend APIs.
+func Honeypot(db *server.Database, geoip *server.GeoIP) gin.HandlerFunc {
 	suspiciousStubs := []string{
 		".env",
 		"wp-admin",
@@ -24,7 +26,7 @@ func Honeypot(db *server.Database, geoip *server.GeoIP) server.MiddlewareFunc {
 		"swagger-ui",
 		"cmd=",
 		"exec=",
-		"jndi:", // Added Log4Shell JNDI injection footprint
+		"jndi:", // Log4Shell footprint
 	}
 
 	isSuspicious := func(path, rawQuery string) bool {
@@ -38,69 +40,64 @@ func Honeypot(db *server.Database, geoip *server.GeoIP) server.MiddlewareFunc {
 		return false
 	}
 
-	return func(next server.HandlerFunc) server.HandlerFunc {
-		return func(req *server.Request, res *server.ResponseWriter) {
-			// Never block legitimate API calls to the dashboard
-			if strings.HasPrefix(req.Path, "/api/threats") || req.Path == "/" || strings.HasPrefix(req.Path, "/static") || strings.HasPrefix(req.Path, "/dashboard") {
-				next(req, res)
-				return
-			}
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+		rawQuery := c.Request.URL.RawQuery
 
-			// We treat EVERYTHING else as a potential threat probe for the honeypot
-			if isSuspicious(req.Path, req.RawQuery) {
-				// Record the attack
-				ip := extractIP(req.RemoteAddr)
-                
-				// Construct payload fingerprint
-				payload := req.Method + " " + req.Path
-				if len(req.RawQuery) > 0 {
-					payload += "?" + req.RawQuery
-				}
-				
-				if len(req.Body) > 0 {
-					bodyStr := string(req.Body)
-					if len(bodyStr) > 200 {
-                         // Truncate massive binary payloads
-						bodyStr = bodyStr[:200] + "..."
-					}
-					payload += "\n" + bodyStr
-				}
-
-				targetPath := req.Path
-
-				// Fire and forget the geoip lookup and database save so we don't block the high-volume TCP socket
-				go func() {
-					loc := geoip.Lookup(ip)
-
-					db.LogAttack(server.AttackEvent{
-						IP:        ip,
-						Country:   loc.Country,
-						City:      loc.City,
-						Lat:       loc.Lat,
-						Lon:       loc.Lon,
-						Payload:   payload,
-						Target:    targetPath,
-						Timestamp: time.Now(),
-					})
-				}()
-
-				// Return a fake positive response to keep them attacking
-				res.WriteText(200, "# Honeypot Access Granted\n{\n  \"status\": \"success\"\n}")
-				return
-			}
-
-			// Allow normal traffic to pass through
-			next(req, res)
+		// Never block legitimate API calls to the dashboard
+		if strings.HasPrefix(path, "/api/threats") || path == "/" || strings.HasPrefix(path, "/static") || strings.HasPrefix(path, "/dashboard") {
+			c.Next()
+			return
 		}
-	}
-}
 
-// extractIP pulls out the IP from net.Addr strings like "10.0.0.1:45312"
-func extractIP(remoteAddr string) string {
-	if idx := strings.LastIndex(remoteAddr, ":"); idx != -1 {
-		// Parse out port and clean up IPv6 brackets like [::1]
-		ip := remoteAddr[:idx]
-		return strings.Trim(ip, "[]")
+		// We treat EVERYTHING else as a potential threat probe for the honeypot
+		if isSuspicious(path, rawQuery) {
+			// Gin natively handles proper proxy header ip extraction
+			ip := c.ClientIP()
+			ip = strings.Trim(ip, "[]") // Sanitize IPv6 brackets for GeoIP 
+
+			payload := c.Request.Method + " " + path
+			if len(rawQuery) > 0 {
+				payload += "?" + rawQuery
+			}
+
+			// We only parse the body if we've flagged an attack, ensuring we don't break downstream handlers
+			bodyBytes, _ := io.ReadAll(c.Request.Body)
+			if len(bodyBytes) > 0 {
+				bodyStr := string(bodyBytes)
+				if len(bodyStr) > 200 {
+					bodyStr = bodyStr[:200] + "..." // Truncate giant malicious blobs
+				}
+				payload += "\n" + bodyStr
+			}
+
+			// Re-inject the body into Gin's context just in case
+			c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			targetPath := path
+
+			// Concurrency Metric: Fire off Goroutine so the Hacker connection isn't blocked by Postgres latency
+			go func() {
+				loc := geoip.Lookup(ip)
+
+				db.LogAttack(server.AttackEvent{
+					IP:        ip,
+					Country:   loc.Country,
+					City:      loc.City,
+					Lat:       loc.Lat,
+					Lon:       loc.Lon,
+					Payload:   payload,
+					Target:    targetPath,
+					Timestamp: time.Now(),
+				})
+			}()
+
+			// Trap the attacker by returning a false 200 OK
+			c.JSON(200, gin.H{"status": "success", "message": "# Honeypot Access Granted"})
+			c.Abort()
+			return
+		}
+
+		// Allow normal safe traffic
+		c.Next()
 	}
-	return strings.Trim(remoteAddr, "[]")
 }
