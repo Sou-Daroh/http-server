@@ -18,15 +18,8 @@ body, html {
 }
 
 #app {
-  display: grid;
   height: 100vh;
-  grid-template-columns: 2fr 1fr;
-  grid-template-rows: auto 1fr;
-  grid-template-areas:
-    "header header"
-    "map sidebar";
-  gap: 1rem;
-  padding: 1rem;
+  width: 100vw;
   box-sizing: border-box;
 }
 

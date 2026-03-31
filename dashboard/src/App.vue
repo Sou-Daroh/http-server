@@ -284,8 +284,15 @@ button:hover {
   background: rgba(239, 68, 68, 0.1);
 }
 .dashboard-wrapper {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   height: 100vh;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "header header"
+    "map sidebar";
+  gap: 1rem;
+  padding: 1rem;
+  box-sizing: border-box;
 }
 </style>
