@@ -3,12 +3,15 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 
 	"github.com/Sou-Daroh/http-server/middleware"
 	"github.com/Sou-Daroh/http-server/server"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/gorilla/websocket"
 )
 
 func main() {
@@ -33,8 +36,12 @@ func main() {
 	// Initialize Gin Routing Engine
 	r := gin.Default()
 
+	// Initialize WebSocket Hub (Go Concurrency Showcase)
+	hub := server.NewHub()
+	go hub.Run()
+
 	// --- Inject Gin Honeypot Trap ---
-	r.Use(middleware.Honeypot(db, geoip))
+	r.Use(middleware.Honeypot(db, geoip, hub))
 
 	// --- Public Routes ---
 	r.Static("/static", "./static")
@@ -45,6 +52,48 @@ func main() {
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok", "honeypot": "armed"})
+	})
+
+	// --- WebSocket Real-Time Threat Feed ---
+	var upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+
+	r.GET("/ws", func(c *gin.Context) {
+		// Validate JWT from query string (WebSocket can't send headers)
+		tokenStr := c.Query("token")
+		if tokenStr == "" {
+			c.JSON(401, gin.H{"error": "Missing token"})
+			return
+		}
+
+		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method")
+			}
+			return server.JWTSecret, nil
+		})
+		if err != nil || !token.Valid {
+			c.JSON(401, gin.H{"error": "Invalid token"})
+			return
+		}
+
+		// Upgrade HTTP → WebSocket
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			log.Printf("[WS] Upgrade failed: %v", err)
+			return
+		}
+
+		client := &server.Client{
+			Hub:  hub,
+			Conn: conn,
+			Send: make(chan []byte, 256),
+		}
+		hub.Register <- client
+
+		go client.WritePump()
+		go client.ReadPump()
 	})
 
 	// Dashboard Authentication Gateway
