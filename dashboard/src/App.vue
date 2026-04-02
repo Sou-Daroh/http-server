@@ -9,6 +9,7 @@ const loginError = ref('')
 
 const attacks = ref([])
 const leaderboards = ref([])
+const attackCount = ref(0)
 let map = null
 let markersGroup = null
 let statsInterval = null
@@ -81,6 +82,7 @@ const connectWebSocket = () => {
     try {
       const attack = JSON.parse(event.data)
       attacks.value.unshift(attack)
+      attackCount.value++
       // Keep only the last 50 attacks in memory
       if (attacks.value.length > 50) attacks.value.pop()
       drawMarkers()
@@ -207,7 +209,14 @@ const formatTime = (ts) => {
         <div class="pulsating-circle"></div>
         <h1>OVERWATCH <span style="font-weight: 300; opacity: 0.5;">| Cyber Threat Intelligence Engine</span></h1>
       </div>
-      <button @click="handleLogout" class="logout-btn">Terminate Session</button>
+      <div class="header-right">
+        <div class="attack-badge" :class="{ 'badge-flash': attackCount > 0 }">
+          <span class="badge-icon">⚡</span>
+          <span class="badge-count">{{ attackCount }}</span>
+          <span class="badge-label">LIVE INTERCEPTS</span>
+        </div>
+        <button @click="handleLogout" class="logout-btn">Terminate Session</button>
+      </div>
     </header>
     
     <div class="map-container" id="threat-map"></div>
@@ -325,5 +334,45 @@ button:hover {
   gap: 1rem;
   padding: 1rem;
   box-sizing: border-box;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.attack-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 35, 60, 0.3);
+  background: rgba(239, 35, 60, 0.08);
+  font-family: 'Inter', system-ui, sans-serif;
+  transition: all 0.3s ease;
+}
+.badge-flash {
+  animation: badgePulse 2s infinite;
+}
+.badge-icon {
+  font-size: 1.1rem;
+}
+.badge-count {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ef233c;
+  min-width: 24px;
+  text-align: center;
+}
+.badge-label {
+  font-size: 0.65rem;
+  color: #8d99ae;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+@keyframes badgePulse {
+  0% { border-color: rgba(239, 35, 60, 0.3); }
+  50% { border-color: rgba(239, 35, 60, 0.8); box-shadow: 0 0 12px rgba(239, 35, 60, 0.3); }
+  100% { border-color: rgba(239, 35, 60, 0.3); }
 }
 </style>
