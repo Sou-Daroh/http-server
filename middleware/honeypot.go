@@ -54,7 +54,7 @@ func Honeypot(db *server.Database, geoip *server.GeoIP, hub *server.Hub) gin.Han
 		if isSuspicious(path, rawQuery) {
 			// Gin natively handles proper proxy header ip extraction
 			ip := c.ClientIP()
-			ip = strings.Trim(ip, "[]") // Sanitize IPv6 brackets for GeoIP 
+			ip = strings.Trim(ip, "[]") // Sanitize IPv6 brackets for GeoIP
 
 			payload := c.Request.Method + " " + path
 			if len(rawQuery) > 0 {

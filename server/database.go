@@ -39,7 +39,7 @@ func NewDatabase(dsn string) (*Database, error) {
 		return nil, fmt.Errorf("open postgres: %w", err)
 	}
 
-	// Advanced Training Requirement: Connection Pooling for Scalability 
+	// Advanced Training Requirement: Connection Pooling for Scalability
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(25)
 	db.SetConnMaxLifetime(5 * time.Minute)
@@ -157,7 +157,7 @@ func (d *Database) SeedDefaultAdmin() error {
 	var count int
 	d.db.QueryRow("SELECT COUNT(*) FROM admins").Scan(&count)
 	if count == 0 {
-		hash, _ := HashPassword("admin123") 
+		hash, _ := HashPassword("admin123")
 		_, err := d.db.Exec("INSERT INTO admins (username, password_hash) VALUES ($1, $2)", "admin", hash)
 		return err
 	}

@@ -12,7 +12,7 @@ import (
 var (
 	// StrikeCache temporarily records the number of times an IP hits the honeypot
 	StrikeCache sync.Map
-	
+
 	// BannedCache acts as our high-speed Web Application Firewall blocklist
 	BannedCache sync.Map
 )

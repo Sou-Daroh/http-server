@@ -22,7 +22,7 @@ type GeoIP struct {
 	db *geoip2.Reader
 }
 
-// NewGeoIP attempts to open a MaxMind .mmdb database. 
+// NewGeoIP attempts to open a MaxMind .mmdb database.
 // If it fails (file not found), it gracefully degrades to a free web API.
 func NewGeoIP(dbPath string) (*GeoIP, error) {
 	db, err := geoip2.Open(dbPath)

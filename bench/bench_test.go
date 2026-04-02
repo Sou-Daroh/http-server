@@ -9,12 +9,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// BenchmarkGinRouter matches the throughput of Gin's routing engine 
+// BenchmarkGinRouter matches the throughput of Gin's routing engine
 // against our old custom TCP router for an accurate syllabus comparison.
 func BenchmarkGinRouter10Routes(b *testing.B) {
 	// Suppress Gin debug logging for accurate CPU measurements
 	gin.SetMode(gin.ReleaseMode)
-	
+
 	r := gin.New()
 	noop := func(c *gin.Context) {
 		c.Status(200)
@@ -33,7 +33,7 @@ func BenchmarkGinRouter10Routes(b *testing.B) {
 
 	// Simulate hitting the nested parameter route
 	req, _ := http.NewRequest("GET", "/users/42", nil)
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
 
@@ -47,7 +47,7 @@ func BenchmarkGinRouter10Routes(b *testing.B) {
 func BenchmarkGinJsonPayload(b *testing.B) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	
+
 	r.POST("/login", func(c *gin.Context) {
 		var req struct {
 			Username string `json:"username"`
