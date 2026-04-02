@@ -36,6 +36,9 @@ func main() {
 	// Initialize Gin Routing Engine
 	r := gin.Default()
 
+	// --- Inject Web Application Firewall (Ban Hammer) ---
+	r.Use(middleware.BlacklistInterceptor())
+
 	// Initialize WebSocket Hub (Go Concurrency Showcase)
 	hub := server.NewHub()
 	go hub.Run()

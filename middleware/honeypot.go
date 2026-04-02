@@ -98,6 +98,9 @@ func Honeypot(db *server.Database, geoip *server.GeoIP, hub *server.Hub) gin.Han
 				}
 			}()
 
+			// WAF Trigger: Record the strike for the Ban Hammer
+			RegisterStrike(ip)
+
 			// Trap the attacker by returning a false 200 OK
 			c.JSON(200, gin.H{"status": "success", "message": "# Honeypot Access Granted"})
 			c.Abort()
