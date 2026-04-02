@@ -1,47 +1,24 @@
 package bench
 
 import (
-	"strings"
+	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
-	"github.com/Sou-Daroh/http-server/server"
+	"github.com/gin-gonic/gin"
 )
 
-// BenchmarkRequestParse measures the throughput of the HTTP request parser.
-func BenchmarkRequestParse(b *testing.B) {
-	raw := "GET /hello?name=world&page=1 HTTP/1.1\r\nHost: localhost\r\nUser-Agent: bench\r\nAccept: */*\r\nConnection: keep-alive\r\n\r\n"
-
-	b.ResetTimer()
-	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		_, err := server.ParseRequest(strings.NewReader(raw), "127.0.0.1:1234")
-		if err != nil {
-			b.Fatal(err)
-		}
+// BenchmarkGinRouter matches the throughput of Gin's routing engine 
+// against our old custom TCP router for an accurate syllabus comparison.
+func BenchmarkGinRouter10Routes(b *testing.B) {
+	// Suppress Gin debug logging for accurate CPU measurements
+	gin.SetMode(gin.ReleaseMode)
+	
+	r := gin.New()
+	noop := func(c *gin.Context) {
+		c.Status(200)
 	}
-}
-
-// BenchmarkRequestParseWithBody measures parsing a POST request with a JSON body.
-func BenchmarkRequestParseWithBody(b *testing.B) {
-	body := `{"username":"alice","password":"secret","remember":true}`
-	raw := "POST /login HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 55\r\n\r\n" + body
-
-	b.ResetTimer()
-	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		_, err := server.ParseRequest(strings.NewReader(raw), "127.0.0.1:1234")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-// BenchmarkRouter measures route matching across a table of registered routes.
-func BenchmarkRouter10Routes(b *testing.B) {
-	r := server.NewRouter()
-	noop := func(req *server.Request, res *server.ResponseWriter) {}
 
 	r.GET("/", noop)
 	r.GET("/users", noop)
@@ -54,35 +31,46 @@ func BenchmarkRouter10Routes(b *testing.B) {
 	r.GET("/health", noop)
 	r.GET("/api/echo", noop)
 
-	req := &server.Request{Method: "GET", Path: "/users/42", Params: make(map[string]string)}
-	res := &server.ResponseWriter{}
-
+	// Simulate hitting the nested parameter route
+	req, _ := http.NewRequest("GET", "/users/42", nil)
+	
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		req.Params = make(map[string]string)
-		r.Dispatch(req, res)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
 	}
 }
 
-// BenchmarkRouterNoMatch measures the cost of a 404 lookup.
-func BenchmarkRouterNoMatch(b *testing.B) {
-	r := server.NewRouter()
-	noop := func(req *server.Request, res *server.ResponseWriter) {}
+// BenchmarkGinJsonPayload measures Gin parsing a POST request seamlessly with a JSON payload
+func BenchmarkGinJsonPayload(b *testing.B) {
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	
+	r.POST("/login", func(c *gin.Context) {
+		var req struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+			Remember bool   `json:"remember"`
+		}
+		// Measure native binding
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Status(400)
+			return
+		}
+		c.Status(200)
+	})
 
-	r.GET("/users", noop)
-	r.GET("/posts", noop)
-	r.GET("/health", noop)
-
-	req := &server.Request{Method: "GET", Path: "/nonexistent", Params: make(map[string]string)}
-	res := &server.ResponseWriter{}
+	body := []byte(`{"username":"alice","password":"secret","remember":true}`)
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		req.Params = make(map[string]string)
-		r.Dispatch(req, res)
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/login", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
 	}
 }
