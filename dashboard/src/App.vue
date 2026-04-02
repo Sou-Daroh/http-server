@@ -11,8 +11,8 @@ const attacks = ref([])
 const leaderboards = ref([])
 let map = null
 let markersGroup = null
-let threatsInterval = null
 let statsInterval = null
+let ws = null
 
 onMounted(() => {
   if (token.value) {
@@ -21,8 +21,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  clearInterval(threatsInterval)
   clearInterval(statsInterval)
+  if (ws) ws.close()
 })
 
 const handleLogin = async () => {
@@ -50,7 +50,7 @@ const handleLogin = async () => {
 const handleLogout = () => {
   token.value = null
   localStorage.removeItem('OverwatchJWT')
-  clearInterval(threatsInterval)
+  if (ws) { ws.close(); ws = null }
   clearInterval(statsInterval)
   attacks.value = []
   leaderboards.value = []
@@ -65,10 +65,41 @@ const handleLogout = () => {
 const startDashboard = async () => {
   await nextTick() 
   initMap()
-  pollThreats()
+  connectWebSocket()
+  pollThreats() // Initial load from REST
   pollStats()
-  threatsInterval = setInterval(pollThreats, 2000)
   statsInterval = setInterval(pollStats, 10000)
+}
+
+const connectWebSocket = () => {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsUrl = `${protocol}//${location.host}/ws?token=${token.value}`
+  
+  ws = new WebSocket(wsUrl)
+
+  ws.onmessage = (event) => {
+    try {
+      const attack = JSON.parse(event.data)
+      attacks.value.unshift(attack)
+      // Keep only the last 50 attacks in memory
+      if (attacks.value.length > 50) attacks.value.pop()
+      drawMarkers()
+    } catch(e) {
+      console.error('WS parse error:', e)
+    }
+  }
+
+  ws.onclose = () => {
+    console.log('WebSocket disconnected. Falling back to polling.')
+    // Graceful degradation: fall back to polling if socket dies
+    if (token.value) {
+      setTimeout(connectWebSocket, 3000) // Auto-reconnect after 3s
+    }
+  }
+
+  ws.onerror = (err) => {
+    console.error('WebSocket error:', err)
+  }
 }
 
 const initMap = () => {
