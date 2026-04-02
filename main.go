@@ -158,6 +158,8 @@ func main() {
 			}
 			c.JSON(200, gin.H{"top_countries": topCountries})
 		})
+
+		api.POST("/simulate", server.SimulateAttack(hub))
 	}
 
 	// --- Start Gin ---

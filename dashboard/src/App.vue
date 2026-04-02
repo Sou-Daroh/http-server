@@ -62,6 +62,17 @@ const handleLogout = () => {
   }
 }
 
+const handleSimulate = async () => {
+  try {
+    await fetch('/api/simulate', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token.value}` }
+    })
+  } catch(e) {
+    console.error('Simulation trigger failed:', e)
+  }
+}
+
 // Ensure the map container is fully rendered before injecting Leaflet
 const startDashboard = async () => {
   await nextTick() 
@@ -222,6 +233,11 @@ const formatTime = (ts) => {
     <div class="map-container" id="threat-map"></div>
 
     <div class="sidebar">
+      <button @click="handleSimulate" class="simulate-btn">
+        <span class="pulsating-circle" style="background:#ef233c; display:inline-block; margin-right:8px;"></span>
+        INITIATE THREAT SIMULATION
+      </button>
+
       <div class="panel stats-panel">
         <h2>Top Attacking Countries</h2>
         <div v-if="leaderboards.length === 0" class="status" style="text-align:center;">Waiting for payload...</div>
@@ -374,5 +390,16 @@ button:hover {
   0% { border-color: rgba(239, 35, 60, 0.3); }
   50% { border-color: rgba(239, 35, 60, 0.8); box-shadow: 0 0 12px rgba(239, 35, 60, 0.3); }
   100% { border-color: rgba(239, 35, 60, 0.3); }
+}
+.simulate-btn {
+  background: rgba(239, 35, 60, 0.15);
+  border: 1px solid rgba(239, 35, 60, 0.5);
+  color: #ef233c;
+  margin-bottom: 20px;
+  animation: badgePulse 2s infinite;
+}
+.simulate-btn:hover {
+  background: rgba(239, 35, 60, 0.3);
+  box-shadow: 0 0 15px rgba(239, 35, 60, 0.4);
 }
 </style>
