@@ -12,7 +12,7 @@ import (
 
 // Honeypot returns a Gin middleware that intercepts suspicious requests
 // and logs them to PostgreSQL before they hit the real backend APIs.
-func Honeypot(db *server.Database, geoip *server.GeoIP) gin.HandlerFunc {
+func Honeypot(db *server.Database, geoip *server.GeoIP, hub *server.Hub) gin.HandlerFunc {
 	suspiciousStubs := []string{
 		".env",
 		"wp-admin",
@@ -45,7 +45,7 @@ func Honeypot(db *server.Database, geoip *server.GeoIP) gin.HandlerFunc {
 		rawQuery := c.Request.URL.RawQuery
 
 		// Never block legitimate API calls to the dashboard
-		if strings.HasPrefix(path, "/api/threats") || path == "/" || strings.HasPrefix(path, "/static") || strings.HasPrefix(path, "/dashboard") {
+		if strings.HasPrefix(path, "/api") || path == "/" || path == "/ws" || strings.HasPrefix(path, "/static") || strings.HasPrefix(path, "/dashboard") || strings.HasPrefix(path, "/assets") {
 			c.Next()
 			return
 		}
@@ -79,7 +79,7 @@ func Honeypot(db *server.Database, geoip *server.GeoIP) gin.HandlerFunc {
 			go func() {
 				loc := geoip.Lookup(ip)
 
-				db.LogAttack(server.AttackEvent{
+				event := server.AttackEvent{
 					IP:        ip,
 					Country:   loc.Country,
 					City:      loc.City,
@@ -88,7 +88,14 @@ func Honeypot(db *server.Database, geoip *server.GeoIP) gin.HandlerFunc {
 					Payload:   payload,
 					Target:    targetPath,
 					Timestamp: time.Now(),
-				})
+				}
+
+				db.LogAttack(event)
+
+				// Push to all connected WebSocket dashboards instantly
+				if hub != nil {
+					hub.Broadcast <- event
+				}
 			}()
 
 			// Trap the attacker by returning a false 200 OK
