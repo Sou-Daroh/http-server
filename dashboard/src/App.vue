@@ -222,9 +222,9 @@ const formatTime = (ts) => {
       </div>
       <div class="header-right">
         <div class="attack-badge" :class="{ 'badge-flash': attackCount > 0 }">
-          <span class="badge-icon">⚡</span>
+          <span class="badge-icon">LIVE</span>
           <span class="badge-count">{{ attackCount }}</span>
-          <span class="badge-label">LIVE INTERCEPTS</span>
+          <span class="badge-label">INTERCEPTS</span>
         </div>
         <button @click="handleLogout" class="logout-btn">Terminate Session</button>
       </div>
