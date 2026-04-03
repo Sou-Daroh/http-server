@@ -117,6 +117,11 @@ const connectWebSocket = () => {
 
 const initMap = () => {
   if (map) return
+  if (!document.getElementById('threat-map')) {
+    setTimeout(initMap, 100)
+    return
+  }
+
   map = L.map('threat-map', {
     center: [20, 0],
     zoom: 2,
