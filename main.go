@@ -31,6 +31,7 @@ func main() {
 
 	// Initialize Gin Routing Engine
 	r := gin.Default()
+	r.SetTrustedProxies(nil)
 
 	// --- Inject Web Application Firewall (Ban Hammer) ---
 	r.Use(middleware.BlacklistInterceptor())
