@@ -178,3 +178,16 @@ h2 {
   font-weight: 600;
   letter-spacing: 0.5px;
 }
+
+.scanning-pulse {
+  animation: scanningPulse 2s infinite ease-in-out;
+  color: var(--text-muted) !important;
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+}
+
+@keyframes scanningPulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; text-shadow: 0 0 10px rgba(148, 163, 184, 0.5); }
+  100% { opacity: 0.4; }
+}

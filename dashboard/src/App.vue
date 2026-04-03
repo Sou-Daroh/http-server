@@ -191,79 +191,90 @@ const formatTime = (ts) => {
 </script>
 
 <template>
-  <!-- Administrator Login Gate -->
-  <div v-if="!token" class="login-wrapper">
-    <div class="login-box panel">
-      <div class="pulsating-circle" style="display:inline-block; margin-bottom: 20px;"></div>
-      <h2>OVERWATCH AUTHENTICATION</h2>
-      <p style="opacity: 0.6; margin-bottom: 30px;">Threat Intelligence Engine V2</p>
+  <transition name="fade" mode="out-in">
+    <!-- Administrator Login Gate -->
+    <div v-if="!token" class="login-wrapper">
+      <div class="login-box panel">
+        <div class="pulsating-circle" style="display:inline-block; margin-bottom: 20px;"></div>
+        <h2>OVERWATCH AUTHENTICATION</h2>
+        <p style="opacity: 0.6; margin-bottom: 30px;">Threat Intelligence Engine V2</p>
+        
+        <form @submit.prevent="handleLogin">
+          <div class="input-group">
+            <label>Administrator ID</label>
+            <input type="text" v-model="username" required autocomplete="username" placeholder="admin">
+          </div>
+          <div class="input-group">
+            <label>Encryption Key</label>
+            <input type="password" v-model="password" required autocomplete="current-password" placeholder="••••••••">
+          </div>
+          <div v-if="loginError" class="status terminal-path" style="margin-bottom: 15px; color: #ef4444;">{{ loginError }}</div>
+          <button type="submit">Establish Secure Connection</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Authenticated Secured Dashboard View -->
+    <div v-else class="dashboard-wrapper">
+      <header>
+        <div class="header-left">
+          <div class="pulsating-circle"></div>
+          <h1>OVERWATCH <span style="font-weight: 300; opacity: 0.5;">| Cyber Threat Intelligence Engine</span></h1>
+        </div>
+        <div class="header-right">
+          <div class="attack-badge" :class="{ 'badge-flash': attackCount > 0 }">
+            <span class="badge-icon">LIVE</span>
+            <span class="badge-count">{{ attackCount }}</span>
+            <span class="badge-label">INTERCEPTS</span>
+          </div>
+          <button @click="handleLogout" class="logout-btn">Terminate Session</button>
+        </div>
+      </header>
       
-      <form @submit.prevent="handleLogin">
-        <div class="input-group">
-          <label>Administrator ID</label>
-          <input type="text" v-model="username" required autocomplete="username" placeholder="admin">
-        </div>
-        <div class="input-group">
-          <label>Encryption Key</label>
-          <input type="password" v-model="password" required autocomplete="current-password" placeholder="••••••••">
-        </div>
-        <div v-if="loginError" class="status terminal-path" style="margin-bottom: 15px; color: #ef4444;">{{ loginError }}</div>
-        <button type="submit">Establish Secure Connection</button>
-      </form>
-    </div>
-  </div>
+      <div class="map-container" id="threat-map"></div>
 
-  <!-- Authenticated Secured Dashboard View -->
-  <div v-else class="dashboard-wrapper">
-    <header>
-      <div class="header-left">
-        <div class="pulsating-circle"></div>
-        <h1>OVERWATCH <span style="font-weight: 300; opacity: 0.5;">| Cyber Threat Intelligence Engine</span></h1>
-      </div>
-      <div class="header-right">
-        <div class="attack-badge" :class="{ 'badge-flash': attackCount > 0 }">
-          <span class="badge-icon">LIVE</span>
-          <span class="badge-count">{{ attackCount }}</span>
-          <span class="badge-label">INTERCEPTS</span>
-        </div>
-        <button @click="handleLogout" class="logout-btn">Terminate Session</button>
-      </div>
-    </header>
-    
-    <div class="map-container" id="threat-map"></div>
+      <div class="sidebar">
+        <button @click="handleSimulate" class="simulate-btn">
+          <span class="pulsating-circle" style="background:#ef233c; display:inline-block; margin-right:8px;"></span>
+          INITIATE THREAT SIMULATION
+        </button>
 
-    <div class="sidebar">
-      <button @click="handleSimulate" class="simulate-btn">
-        <span class="pulsating-circle" style="background:#ef233c; display:inline-block; margin-right:8px;"></span>
-        INITIATE THREAT SIMULATION
-      </button>
-
-      <div class="panel stats-panel">
-        <h2>Top Attacking Countries</h2>
-        <div v-if="leaderboards.length === 0" class="status" style="text-align:center;">Waiting for payload...</div>
-        <div class="leaderboard-row" v-for="stat in leaderboards" :key="stat.country">
-          <span>{{ stat.country }}</span>
-          <span class="status">{{ stat.count }} attacks</span>
+        <div class="panel stats-panel">
+          <h2>Top Attacking Countries</h2>
+          <div v-if="leaderboards.length === 0" class="status scanning-pulse" style="text-align:center;">SCANNING ORIGINS...</div>
+          <div class="leaderboard-row" v-for="stat in leaderboards" :key="stat.country">
+            <span>{{ stat.country }}</span>
+            <span class="status">{{ stat.count }} attacks</span>
+          </div>
         </div>
-      </div>
 
-      <div class="panel terminal-panel" id="terminal">
-        <h2>Live Trapped Payloads</h2>
-        <div v-if="attacks.length === 0" class="status terminal-wait">
-          <div class="pulsating-circle" style="display:inline-block; vertical-align:middle; width:8px; height:8px;"></div> 
-          LISTENING FOR BOTNET ACTIVITY ON PORT 80...
-        </div>
-        <div class="terminal-line" v-for="attack in attacks" :key="attack.id">
-          <span class="terminal-ip">[{{ formatTime(attack.timestamp) }}] {{ attack.ip }} ({{ attack.country }})</span><br/>
-          <span class="terminal-path">Attempted Exploit: {{ attack.target }}</span><br/>
-          <span class="terminal-payload">{{ attack.payload }}</span>
+        <div class="panel terminal-panel" id="terminal">
+          <h2>Live Trapped Payloads</h2>
+          <div v-if="attacks.length === 0" class="status terminal-wait scanning-pulse">
+            <div class="pulsating-circle" style="display:inline-block; vertical-align:middle; width:8px; height:8px;"></div> 
+            LISTENING FOR BOTNET ACTIVITY ON PORT 80...
+          </div>
+          <div class="terminal-line" v-for="attack in attacks" :key="attack.id">
+            <span class="terminal-ip">[{{ formatTime(attack.timestamp) }}] {{ attack.ip }} ({{ attack.country }})</span><br/>
+            <span class="terminal-path">Attempted Exploit: {{ attack.target }}</span><br/>
+            <span class="terminal-payload">{{ attack.payload }}</span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  </transition>
 </template>
 
 <style scoped>
+/* Transition Animations */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.6s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 /* Locked Login Box Styling */
 .login-wrapper {
   display: flex;
@@ -416,5 +427,40 @@ button:hover {
   background: rgba(239, 35, 60, 0.3);
   box-shadow: 0 0 20px var(--primary-glow);
   transform: scale(1.02);
+}
+
+/* Responsive Grid Breakpoints */
+@media (max-width: 1024px) {
+  .dashboard-wrapper {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(400px, 50vh) auto;
+    grid-template-areas:
+      "header"
+      "map"
+      "sidebar";
+    height: auto;
+    min-height: 100vh;
+    padding: 1rem;
+    overflow-y: auto;
+  }
+
+  .map-container {
+    min-height: 400px;
+  }
+
+  header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  .header-left {
+    flex-direction: column;
+  }
+
+  .terminal-panel {
+    min-height: 300px;
+  }
 }
 </style>
